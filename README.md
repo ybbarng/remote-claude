@@ -104,8 +104,23 @@ Claude가 사용자 입력을 기다릴 때 알림을 보내도록 훅을 설정
 ```bash
 #!/bin/bash
 NTFY_TOPIC="${NTFY_TOPIC:-my-claude-topic}"
-curl -s -d "Claude가 입력을 기다리고 있습니다" "ntfy.sh/${NTFY_TOPIC}"
+DEBOUNCE_SECONDS=${NTFY_DEBOUNCE:-300}  # 기본 5분
+LAST_FILE="/tmp/ntfy-last-notify"
+
+LAST=$(cat "$LAST_FILE" 2>/dev/null || echo 0)
+NOW=$(date +%s)
+
+if [ $((NOW - LAST)) -ge "$DEBOUNCE_SECONDS" ]; then
+  curl -s -d "Claude가 입력을 기다리고 있습니다" "ntfy.sh/${NTFY_TOPIC}" || \
+    (sleep 5 && curl -s -d "Claude가 입력을 기다리고 있습니다" "ntfy.sh/${NTFY_TOPIC}")
+  echo "$NOW" > "$LAST_FILE"
+fi
 ```
+
+- 마지막 알림으로부터 5분 이내의 알림은 억제 (debounce)
+- 활발히 작업 중일 때는 알림이 오지 않고, 자리를 비웠을 때만 수신
+- ntfy 무료 플랜의 하루 250건 제한에 여유를 확보 (5분 간격 시 하루 최대 288건이지만, 21시간 연속 알림은 비현실적)
+- `NTFY_DEBOUNCE` 환경 변수로 간격 조절 가능
 
 ```bash
 chmod +x ~/.claude/hooks/notify.sh
