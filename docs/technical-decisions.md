@@ -19,6 +19,7 @@
 - 맥북에서 이미 회사 Tailscale VPN을 사용 중
 - 회사 인프라를 건드리지 않고 개인 스마트폰에서 맥북에 SSH 접속
 - 맥북의 기존 네트워크(인터넷, 회사 VPN)에 영향 없어야 함
+- 무료이고 상업적 사용에 라이선스 제한이 없어야 함
 
 ### 검토한 후보
 
@@ -38,33 +39,43 @@
 - 단점: macOS에서 GUI 앱이 아닌 오픈소스 빌드(`brew install --formula tailscale`)가 필요. userspace 모드에서 SSH 인바운드 수신이 제한적. 설정 복잡도 높음. 회사 보안 정책 위반 가능성.
 - 참고: https://github.com/tailscale/tailscale/wiki/Tailscaled-on-macOS
 
-#### Cloudflare Tunnel
-
-맥북에서 cloudflared를 실행하여 SSH를 Cloudflare 네트워크를 통해 노출.
-
-- 장점: 무료. 관리자 협조 불필요. VPN 없이 인터넷 어디서든 접속 가능.
-- 단점: Cloudflare 서버를 경유하므로 레이턴시 추가. SSH를 인터넷에 노출하는 구조(인증 별도 설정 필요). DNS 및 터널 라우팅 설정이 필요.
-
-#### ZeroTier (선택)
+#### ZeroTier
 
 맥북과 스마트폰에 ZeroTier를 설치하여 가상 LAN 구성.
 
-- 장점: 관리자 협조 불필요. Tailscale과 동일한 P2P 메시 VPN 개념으로 익숙. 기존 네트워크(인터넷, Tailscale)에 영향 없음 — 별도 가상 인터페이스를 사용하고 ZeroTier IP 대역 트래픽만 처리. 무료(25기기). 고정 IP 지정 가능. 설정 간단.
-- 단점: Tailscale(WireGuard, 코드 ~4,000줄)과 달리 자체 프로토콜 사용으로 공격 표면이 넓음. 공개 보안 감사 이력이 WireGuard만큼 명확하지 않음.
+- 장점: 관리자 협조 불필요. Tailscale과 동일한 P2P 메시 VPN 개념으로 익숙. 기존 네트워크(인터넷, Tailscale)에 영향 없음. 고정 IP 지정 가능. 설정 간단.
+- 단점: **무료 플랜이 개인/비상업 용도로 제한됨.** 가격 페이지에 "Just don't try to run your business with it"으로 명시. 업무 용도의 맥북-폰 연결은 상업적 사용에 해당할 수 있음. 유료 플랜은 월 $18. Tailscale(WireGuard, 코드 ~4,000줄)과 달리 자체 프로토콜 사용으로 공격 표면이 넓음.
+- 참고: https://www.zerotier.com/pricing/
 
-### 선택 이유: ZeroTier
+#### Cloudflare Tunnel (선택)
 
-1. **독립성**: 회사 Tailscale 관리자에게 의존하지 않음
-2. **공존 가능**: Tailscale 공식 문서에서 다른 VPN과의 동시 사용이 가능하다고 안내 (https://tailscale.com/kb/1105/other-vpns). ZeroTier는 별도 인터페이스(`zt0`)를 만들고 자체 IP 대역만 라우팅하므로 충돌 없음
-3. **P2P 직접 연결**: NAT traversal로 맥북-폰 직접 연결 시도, 불가 시 릴레이 경유. 릴레이 시에도 E2E 암호화 유지
-4. **설정 단순**: 양쪽에 앱 설치 → 네트워크 가입 → 웹 콘솔에서 승인 → 끝
-5. **보안**: SSH 접속 용도로는 충분. 인터넷에 포트를 직접 노출하지 않음
+맥북에서 cloudflared를 실행하여 SSH를 Cloudflare 네트워크를 통해 노출.
+
+- 장점: 무료 (상업적 사용 포함). 관리자 협조 불필요. VPN 없이 인터넷 어디서든 접속 가능. 폰에 추가 VPN 앱 불필요 (SSH 클라이언트만 있으면 됨). SSH 포트를 인터넷에 직접 열지 않음. Cloudflare Access로 MFA 등 추가 인증 가능.
+- 단점: Cloudflare 서버를 경유하므로 레이턴시 추가. E2E 암호화가 아닌 구간이 존재 (단, SSH 자체가 암호화하므로 실질적 문제 없음). DNS 및 터널 라우팅 설정이 필요. Cloudflare 계정과 도메인이 필요. mosh(UDP)는 터널을 통해 사용 불가.
+
+### 선택 이유: Cloudflare Tunnel
+
+1. **무료 + 상업 사용 가능**: ZeroTier의 라이선스 문제 없음
+2. **독립성**: 회사 Tailscale 관리자에게 의존하지 않음
+3. **폰 설정 최소화**: VPN 앱 설치 불필요, SSH 클라이언트만 있으면 됨
+4. **보안**: SSH 포트를 인터넷에 직접 열지 않음. Cloudflare 경유 시에도 SSH 프로토콜 자체가 세션을 암호화하므로 내용 노출 없음. 필요시 Cloudflare Access로 Zero Trust 인증 추가 가능
+5. **기존 네트워크 영향 없음**: cloudflared는 아웃바운드 연결만 사용하므로 Tailscale과 충돌 없음
 
 ### 주의사항
 
-- ZeroTier 네트워크 설정에서 Default Route(0.0.0.0/0)를 활성화하면 모든 트래픽이 ZeroTier를 타므로 절대 켜지 말 것 (기본값: 꺼짐)
-- 회사 방화벽이 UDP 9993을 차단하면 릴레이 경유. 릴레이도 차단하는 환경에서는 연결 불가
-- Access Control은 반드시 Private 유지
+- Cloudflare 계정과 도메인이 필요 (도메인은 Cloudflare에서 저렴하게 구매 가능)
+- 터널 도메인을 아는 사람은 SSH 접속을 시도할 수 있으므로, 강력한 SSH 키 인증 권장
+- mosh(UDP)는 Cloudflare Tunnel(TCP만 프록시)을 통해 사용 불가 — tmux로 세션 유지를 대체
+- cloudflared를 서비스로 등록하면 맥북 부팅 시 자동 시작
+
+### 기각된 후보 요약
+
+| 후보 | 기각 사유 |
+|------|----------|
+| Tailscale Device Sharing | 회사 관리자 협조 필요 |
+| Tailscale 두 번째 인스턴스 | 설정 복잡, SSH 인바운드 제한적, 보안 정책 위반 가능 |
+| ZeroTier | 무료 플랜이 비상업 용도 한정, 유료는 월 $18 |
 
 ---
 
@@ -81,7 +92,7 @@
 #### Ntfy 셀프호스팅 (맥북에서 서버 실행)
 
 - 장점: 완전한 데이터 통제
-- 단점: 스마트폰이 맥북의 Ntfy 서버에 접속해야 하므로 VPN(ZeroTier) 연결 필수. 푸시 알림을 받기 위해 항상 VPN을 켜놔야 하는 것은 사용 흐름에 맞지 않음
+- 단점: 스마트폰이 맥북의 Ntfy 서버에 접속해야 하므로 VPN 연결 필수. 푸시 알림을 받기 위해 항상 VPN을 켜놔야 하는 것은 사용 흐름에 맞지 않음
 
 #### Pushover
 
@@ -100,9 +111,9 @@
 
 ### 선택 이유: Ntfy 공용 서버 (ntfy.sh)
 
-1. **VPN 독립**: `맥북 → ntfy.sh → APNs/FCM → 폰` 경로로, VPN 연결 없이 알림 수신 가능. "알림 먼저 받고 → VPN 켜고 → SSH 접속" 흐름에 부합
+1. **VPN 독립**: `맥북 → ntfy.sh → APNs/FCM → 폰` 경로로, VPN 연결 없이 알림 수신 가능. "알림 먼저 받고 → SSH 접속" 흐름에 부합
 2. **제로 설정**: 가입 없이 토픽 이름만 정하면 바로 사용
-3. **Rate limit 충분**: 토큰 버킷 방식, 버스트 60건, 5초마다 1건 회복. Claude 세션 수십 개를 동시에 돌리지 않는 한 제한에 걸릴 일 없음
+3. **Rate limit 충분**: debounce 적용 시 일일 한도 초과 불가 (아래 상세)
 4. **보안 대응**: 토픽 이름을 랜덤하게 설정(예: `claude-notify-a8f3k2x9`)하여 추측 방지. 알림 본문에 민감 정보를 넣지 않으면 충분
 
 ### Rate Limit 상세
@@ -196,16 +207,11 @@ caffeinate가 bash를 감싸서 실행하므로:
 | 고지연 환경 | 타이핑 지연 | 로컬 에코로 즉시 반응 |
 | 설치 | 불필요 | `brew install mosh` + Termius 설정 |
 
-### 결론
+### Cloudflare Tunnel에서의 제한
 
-mosh는 필수가 아닌 선택사항. tmux가 세션을 유지하므로 SSH가 끊겨도 `tmux attach`로 복구할 수 있다. mosh는 재접속 과정 자체를 없애주는 편의 기능이다. SSH 끊김이 자주 불편하면 나중에 추가해도 된다.
+**mosh는 Cloudflare Tunnel을 통해 사용할 수 없다.** Cloudflare Tunnel은 TCP만 프록시하고, mosh는 UDP를 사용하기 때문이다. mosh를 사용하려면 같은 LAN에 있거나 별도 VPN(ZeroTier 등)이 필요하다.
 
-### mosh 사용 시 참고
-
-- UDP 포트 60000~61000 사용
-- ZeroTier 가상 네트워크 내에서는 방화벽 제한 없음
-- macOS 방화벽이 켜져 있으면 mosh-server 수신 연결 허용 필요
-- mosh가 죽어도 tmux 세션은 남아 있으므로 SSH로 복구 가능 (상호 보완)
+따라서 이 구성에서는 SSH + tmux 조합으로 세션 유지를 대체한다. SSH가 끊겨도 `tmux attach`로 바로 복구 가능하므로 실용적으로 충분하다.
 
 ---
 
@@ -236,30 +242,30 @@ mosh는 필수가 아닌 선택사항. tmux가 세션을 유지하므로 SSH가 
 │   ├─ Claude Code 세션들                              │
 │   └─ Claude 훅 → curl ntfy.sh (HTTPS, 인터넷 경유)   │
 │                                                      │
-│   ZeroTier (가상 LAN, 항상 켜짐)                      │
+│   cloudflared (SSH 터널, 서비스로 상시 실행)           │
 │   Tailscale (회사 VPN, 독립적으로 공존)               │
 └─────────────────────────────────────────────────────┘
          │                          │
-         │ HTTPS                    │ ZeroTier (P2P/릴레이)
+         │ HTTPS                    │ Cloudflare Tunnel (TCP)
          ▼                          │
     ntfy.sh 서버                     │
          │                          │
-         │ APNs/FCM                 │ SSH/mosh
+         │ APNs/FCM                 │ SSH
          ▼                          ▼
 ┌─────────────────────────────────────────────────────┐
 │ 스마트폰                                             │
 │                                                      │
 │   Ntfy 앱 → 알림 수신 (VPN 불필요)                   │
-│   ZeroTier → 필요할 때만 활성화                       │
-│   Termius → SSH/mosh로 tmux 세션 접속                │
+│   Termius → SSH로 tmux 세션 접속                     │
 └─────────────────────────────────────────────────────┘
 ```
 
 ## 참고 자료
 
 - [Claude Code On-The-Go](https://granda.org/en/2026/01/02/claude-code-on-the-go/) — 원본 블로그
-- [ZeroTier 프로토콜](https://docs.zerotier.com/protocol/) — ZeroTier 동작 방식
-- [Tailscale: 다른 VPN과 공존](https://tailscale.com/kb/1105/other-vpns) — Tailscale + ZeroTier 공존 가능 근거
-- [Tailscale Device Sharing](https://tailscale.com/kb/1084/sharing) — 검토한 대안
+- [Cloudflare Tunnel 문서](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) — 터널 설정
+- [Cloudflare Tunnel SSH](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/use-cases/ssh/) — SSH 터널 가이드
+- [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/policies/access/) — Zero Trust 인증 (선택)
+- [Tailscale: 다른 VPN과 공존](https://tailscale.com/kb/1105/other-vpns) — Tailscale + 다른 VPN 공존 근거
 - [ntfy 문서](https://docs.ntfy.sh/) — 알림 서비스
 - [ntfy Rate Limiting](https://docs.ntfy.sh/config/#rate-limiting) — Rate limit 상세
