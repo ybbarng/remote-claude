@@ -47,27 +47,27 @@
 - 단점: **무료 플랜이 개인/비상업 용도로 제한됨.** 가격 페이지에 "Just don't try to run your business with it"으로 명시. 업무 용도의 맥북-폰 연결은 상업적 사용에 해당할 수 있음. 유료 플랜은 월 $18. Tailscale(WireGuard, 코드 ~4,000줄)과 달리 자체 프로토콜 사용으로 공격 표면이 넓음.
 - 참고: https://www.zerotier.com/pricing/
 
-#### Cloudflare Tunnel (선택)
+#### Cloudflare Tunnel
 
 맥북에서 cloudflared를 실행하여 SSH를 Cloudflare 네트워크를 통해 노출.
 
 - 장점: 무료 (상업적 사용 포함). 관리자 협조 불필요. VPN 없이 인터넷 어디서든 접속 가능. 폰에 추가 VPN 앱 불필요 (SSH 클라이언트만 있으면 됨). SSH 포트를 인터넷에 직접 열지 않음. Cloudflare Access로 MFA 등 추가 인증 가능.
-- 단점: Cloudflare 서버를 경유하므로 레이턴시 추가. E2E 암호화가 아닌 구간이 존재 (단, SSH 자체가 암호화하므로 실질적 문제 없음). DNS 및 터널 라우팅 설정이 필요. Cloudflare 계정과 도메인이 필요. mosh(UDP)는 터널을 통해 사용 불가.
+- 단점: Cloudflare 서버를 경유하므로 레이턴시 추가. DNS 및 터널 라우팅 설정이 필요. Cloudflare 계정과 도메인이 필요 (도메인 연 ~$10). **mosh(UDP)는 TCP만 프록시하므로 사용 불가.**
 
-### 선택 이유: Cloudflare Tunnel
+#### 개인 서버 경유 — SSH 리버스 터널 (선택)
 
-1. **무료 + 상업 사용 가능**: ZeroTier의 라이선스 문제 없음
-2. **독립성**: 회사 Tailscale 관리자에게 의존하지 않음
-3. **폰 설정 최소화**: VPN 앱 설치 불필요, SSH 클라이언트만 있으면 됨
-4. **보안**: SSH 포트를 인터넷에 직접 열지 않음. Cloudflare 경유 시에도 SSH 프로토콜 자체가 세션을 암호화하므로 내용 노출 없음. 필요시 Cloudflare Access로 Zero Trust 인증 추가 가능
-5. **기존 네트워크 영향 없음**: cloudflared는 아웃바운드 연결만 사용하므로 Tailscale과 충돌 없음
+공인 IP가 있는 개인 서버에 autossh로 리버스 터널을 유지하고, 폰에서 mosh로 서버에 접속하면 자동으로 맥북 tmux 세션에 연결.
 
-### 주의사항
+- 장점: 무료 (기존 서버 활용). mosh(UDP) 사용 가능. 관리자 협조 불필요. 각 도구(autossh, mosh, tmux)가 오래 검증됨. 전체 구조를 직접 통제.
+- 단점: 공인 IP가 있는 서버가 필요. autossh, 서버 유저, mosh 등 관리 포인트가 많음. 서버가 다운되면 접속 불가.
 
-- Cloudflare 계정과 도메인이 필요 (도메인은 Cloudflare에서 저렴하게 구매 가능)
-- 터널 도메인을 아는 사람은 SSH 접속을 시도할 수 있으므로, 강력한 SSH 키 인증 권장
-- mosh(UDP)는 Cloudflare Tunnel(TCP만 프록시)을 통해 사용 불가 — tmux로 세션 유지를 대체
-- cloudflared를 서비스로 등록하면 맥북 부팅 시 자동 시작
+### 선택 이유: 개인 서버 경유 (SSH 리버스 터널)
+
+1. **mosh 지원**: 모바일 환경에서 네트워크 전환(와이파이 ↔ 셀룰러) 시 끊김 없는 접속이 가장 중요한 요구사항. Cloudflare Tunnel은 TCP만 프록시하므로 mosh 사용 불가
+2. **무료**: 이미 보유한 개인 서버를 활용하므로 추가 비용 없음
+3. **독립성**: 회사 Tailscale 관리자에게 의존하지 않음. 특정 서비스에 종속되지 않음
+4. **보안**: 프록시 전용 유저(셸/sudo 없음, 비밀번호 잠금). 리버스 터널 포트는 서버 localhost에서만 접근 가능. SSH 키 인증만 허용
+5. **확장성**: 같은 서버에서 포트만 다르게 하여 다른 사용자 추가 가능
 
 ### 기각된 후보 요약
 
@@ -76,6 +76,7 @@
 | Tailscale Device Sharing | 회사 관리자 협조 필요 |
 | Tailscale 두 번째 인스턴스 | 설정 복잡, SSH 인바운드 제한적, 보안 정책 위반 가능 |
 | ZeroTier | 무료 플랜이 비상업 용도 한정, 유료는 월 $18 |
+| Cloudflare Tunnel | mosh(UDP) 사용 불가. 개인 서버가 있으므로 불필요 |
 
 ---
 
@@ -166,10 +167,10 @@ macOS 내장 잠자기 방지 유틸리티.
 ### 조합 방식
 
 ```bash
-tmux new-session -s claude 'caffeinate -s -- bash'
+tmux new-session -s claude 'caffeinate -s -- zsh'
 ```
 
-caffeinate가 bash를 감싸서 실행하므로:
+caffeinate가 zsh를 감싸서 실행하므로:
 - tmux 세션이 살아 있는 동안 caffeinate도 실행
 - tmux 세션 종료 시 caffeinate도 자동 종료
 - 별도로 caffeinate를 관리할 필요 없음
@@ -207,11 +208,9 @@ caffeinate가 bash를 감싸서 실행하므로:
 | 고지연 환경 | 타이핑 지연 | 로컬 에코로 즉시 반응 |
 | 설치 | 불필요 | `brew install mosh` + Termius 설정 |
 
-### Cloudflare Tunnel에서의 제한
+### 현재 구성에서의 mosh
 
-**mosh는 Cloudflare Tunnel을 통해 사용할 수 없다.** Cloudflare Tunnel은 TCP만 프록시하고, mosh는 UDP를 사용하기 때문이다. mosh를 사용하려면 같은 LAN에 있거나 별도 VPN(ZeroTier 등)이 필요하다.
-
-따라서 이 구성에서는 SSH + tmux 조합으로 세션 유지를 대체한다. SSH가 끊겨도 `tmux attach`로 바로 복구 가능하므로 실용적으로 충분하다.
+개인 서버 경유 방식에서는 mosh를 사용할 수 있다. 폰에서 서버까지 mosh(UDP)로 접속하고, 서버에서 맥북까지는 SSH 리버스 터널(TCP)을 사용한다. mosh의 네트워크 전환 대응 이점은 폰-서버 구간에서 발휘되므로 핵심 요구사항을 충족한다.
 
 ---
 
@@ -235,37 +234,35 @@ caffeinate가 bash를 감싸서 실행하므로:
 ## 전체 구성 요약
 
 ```
-┌─────────────────────────────────────────────────────┐
-│ 맥북                                                 │
-│                                                      │
-│   tmux 세션 (caffeinate -s로 잠자기 방지)             │
-│   ├─ Claude Code 세션들                              │
-│   └─ Claude 훅 → curl ntfy.sh (HTTPS, 인터넷 경유)   │
-│                                                      │
-│   cloudflared (SSH 터널, 서비스로 상시 실행)           │
-│   Tailscale (회사 VPN, 독립적으로 공존)               │
-└─────────────────────────────────────────────────────┘
-         │                          │
-         │ HTTPS                    │ Cloudflare Tunnel (TCP)
-         ▼                          │
-    ntfy.sh 서버                     │
-         │                          │
-         │ APNs/FCM                 │ SSH
-         ▼                          ▼
-┌─────────────────────────────────────────────────────┐
-│ 스마트폰                                             │
-│                                                      │
-│   Ntfy 앱 → 알림 수신 (VPN 불필요)                   │
-│   Termius → SSH로 tmux 세션 접속                     │
-└─────────────────────────────────────────────────────┘
+┌─ 맥북 ──────────────────────────────┐
+│                                      │
+│  tmux (caffeinate -s로 잠자기 방지)  │
+│  ├─ Claude Code 세션들               │
+│  └─ Claude 훅 → curl ntfy.sh        │
+│                                      │
+│  autossh (리버스 터널, launchd)      │
+│  └─ -R 2222:localhost:22 → 서버     │
+└──────────────────────────────────────┘
+        │                    │
+        │ SSH 리버스 터널     │ HTTPS
+        ▼                    ▼
+┌─ 개인 서버 ────┐     ntfy.sh 서버
+│                 │          │
+│  claude 유저    │          │ APNs/FCM
+│  (프록시 전용)  │          ▼
+│  :2222→맥북:22 │   ┌─ 스마트폰 ─────┐
+└─────────────────┘   │                 │
+        ▲              │  Ntfy 앱       │
+        │ mosh (UDP)   │  Termius       │
+        │              │                │
+        └──────────────┘                │
+                       └─────────────────┘
 ```
 
 ## 참고 자료
 
 - [Claude Code On-The-Go](https://granda.org/en/2026/01/02/claude-code-on-the-go/) — 원본 블로그
-- [Cloudflare Tunnel 문서](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) — 터널 설정
-- [Cloudflare Tunnel SSH](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/use-cases/ssh/) — SSH 터널 가이드
-- [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/policies/access/) — Zero Trust 인증 (선택)
-- [Tailscale: 다른 VPN과 공존](https://tailscale.com/kb/1105/other-vpns) — Tailscale + 다른 VPN 공존 근거
+- [autossh](https://www.harding.motd.ca/autossh/) — SSH 리버스 터널 자동 유지
+- [mosh](https://mosh.org/) — UDP 기반 원격 접속
 - [ntfy 문서](https://docs.ntfy.sh/) — 알림 서비스
 - [ntfy Rate Limiting](https://docs.ntfy.sh/config/#rate-limiting) — Rate limit 상세
