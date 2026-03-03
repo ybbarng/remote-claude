@@ -244,6 +244,53 @@ Termius에서 호스트 추가:
 - **Key**: Termius에서 생성한 ED25519 키
 - **Mosh**: 활성화
 
+### 일상 사용
+
+#### 세션 시작 (맥북)
+
+```bash
+# 새 세션 시작 (caffeinate로 잠자기 방지, 세션 종료 시 자동 해제)
+tmux new-session -s claude 'caffeinate -s -- zsh'
+
+# 세션 안에서 Claude Code 실행
+claude
+```
+
+#### tmux 기본 조작
+
+| 키 | 동작 |
+|---|---|
+| `Ctrl+A`, `D` | 세션에서 빠져나오기 (detach) |
+| `Ctrl+A`, `Ctrl+C` | 새 윈도우 생성 |
+| `Ctrl+A`, `n` / `p` | 다음 / 이전 윈도우 |
+| `Ctrl+A`, `1~9` | 윈도우 번호로 이동 |
+| `Ctrl+A`, `[` | 복사 모드 (스크롤, vi 키로 이동) |
+| `Ctrl+A`, `r` | 설정 리로드 |
+
+#### 세션 복귀 (맥북)
+
+```bash
+# 기존 세션에 다시 붙기
+tmux attach -t claude
+
+# iTerm2 통합 모드 (tmux 윈도우 = iTerm2 탭)
+tmux -CC attach -t claude
+```
+
+#### 폰에서 접속
+
+Termius에서 저장된 호스트를 탭하면 자동으로 맥북 tmux 세션에 연결된다.
+
+#### 터널 상태 확인
+
+```bash
+# 맥북에서 autossh 프로세스 확인
+pgrep -f autossh
+
+# 서버에서 터널 포트 확인
+ss -tlnp | grep 2222
+```
+
 ### 사용 흐름
 
 1. 맥북에서 tmux 세션 시작 + Claude Code 실행 (autossh 터널은 launchd가 자동 관리)
