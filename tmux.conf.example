@@ -55,16 +55,10 @@ bind -r J resize-pane -D 5
 bind -r K resize-pane -U 5
 bind -r L resize-pane -R 5
 
-# Solarized 256 테마
-set-option -g status-style bg=colour235,fg=colour136
-set-window-option -g window-status-style fg=colour244,bg=default,dim
-set-window-option -g window-status-current-style fg=colour166,bg=default,bright
-set-option -g pane-border-style fg=colour235
-set-option -g pane-active-border-style fg=colour240
-set-option -g message-style bg=colour235,fg=colour166
-set-option -g display-panes-active-colour colour33
-set-option -g display-panes-colour colour166
-set-window-option -g clock-mode-colour colour64
+# Catppuccin 테마
+set -g @catppuccin_flavor 'mocha'
+set -g @catppuccin_window_status_style 'rounded'
+set -g @catppuccin_window_flags 'icon'
 
 # vi 모드
 setw -g mode-keys vi
@@ -102,5 +96,15 @@ set -g focus-events on
 set -g @plugin 'tmux-plugins/tpm'
 set -g @plugin 'tmux-plugins/tmux-sensible'
 set -g @plugin 'tmux-plugins/tmux-resurrect'
+set -g @plugin 'tmux-plugins/tmux-continuum'
+set -g @continuum-restore 'on'
+set -g @plugin 'tmux-plugins/tmux-yank'
+set -g @plugin 'catppuccin/tmux#v2.1.3'
 
 run '~/.tmux/plugins/tpm/tpm'
+
+# 상태바 (catppuccin 로드 후 설정)
+set -g status-left ""
+set -g status-right-length 100
+set -g status-right "#{E:@catppuccin_status_application} #{E:@catppuccin_status_session} #{E:@catppuccin_status_date_time}"
+set -g @catppuccin_date_time_text " %m/%d %H:%M"
